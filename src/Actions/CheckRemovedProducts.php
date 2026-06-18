@@ -27,7 +27,7 @@ class CheckRemovedProducts implements ChecksRemovedProducts
                 ->where('exists_in_magento', '=', true)
                 ->count();
 
-            $ratio = $totalCount > 0 ? $skus->count() / $totalCount : 0.0;
+            $ratio = $totalCount > 0 ? $skus->count() / $totalCount : 0;
 
             if ($ratio > $threshold) {
                 throw new DeletionThresholdExceededException($skus->count(), $totalCount, $threshold);
