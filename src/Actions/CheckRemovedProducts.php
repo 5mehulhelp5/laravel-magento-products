@@ -6,6 +6,7 @@ namespace JustBetter\MagentoProducts\Actions;
 
 use JustBetter\MagentoProducts\Contracts\ChecksRemovedProducts;
 use JustBetter\MagentoProducts\Events\ProductDeletedInMagentoEvent;
+use JustBetter\MagentoProducts\Exceptions\DeletionThresholdExceededException;
 use JustBetter\MagentoProducts\Models\MagentoProduct;
 
 class CheckRemovedProducts implements ChecksRemovedProducts
@@ -17,6 +18,21 @@ class CheckRemovedProducts implements ChecksRemovedProducts
             ->where('retrieved', '=', false);
 
         $skus = $query->select(['sku'])->get();
+
+        /** @var ?float $threshold */
+        $threshold = config('magento-products.deletion_threshold');
+
+        if ($threshold !== null) {
+            $totalCount = MagentoProduct::query()
+                ->where('exists_in_magento', '=', true)
+                ->count();
+
+            $ratio = $totalCount > 0 ? $skus->count() / $totalCount : 0.0;
+
+            if ($ratio > $threshold) {
+                throw new DeletionThresholdExceededException($skus->count(), $totalCount, $threshold);
+            }
+        }
 
         $query->update([
             'exists_in_magento' => false,

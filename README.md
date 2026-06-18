@@ -53,6 +53,11 @@ $exists = app(\JustBetter\MagentoProducts\Contracts\RetrievesProductData::class)
 ```
 
 
+### Deletion safeguard
+
+To prevent accidental deletion of products a safeguard is built in which prevents the deletion event firing if the number of products to be deleted exceeds the configured threshold.
+This threshold can be configured in the configuration file and is in percentages. For example, a value of `0.1` (10%) will stop deletions if 11 products are deleted of 100 total.
+
 ## Events
 
 When your application discovers new products in Magento you should dispatch one of the following events:
