@@ -1,6 +1,14 @@
 # Changelog 
 
-[Unreleased changes](https://github.com/justbetter/laravel-magento-products/compare/1.8.0...main)
+[Unreleased changes](https://github.com/justbetter/laravel-magento-products/compare/1.9.0...main)
+## [1.9.0](https://github.com/justbetter/laravel-magento-products/releases/tag/1.9.0) - 2026-06-18
+
+### What's Changed
+* Add safeguards for removed products by @VincentBean in https://github.com/justbetter/laravel-magento-products/pull/19
+
+
+**Full Changelog**: https://github.com/justbetter/laravel-magento-products/compare/1.8.0...1.9.0
+
 ## [1.8.0](https://github.com/justbetter/laravel-magento-products/releases/tag/1.8.0) - 2026-04-02
 
 ### What's Changed
