@@ -19,7 +19,7 @@ final class CheckRemovedProductsTest extends TestCase
     {
         Event::fake();
 
-        config()->set('magento-products.deletion_threshold', null);
+        config()->set('magento-products.deletion_threshold');
 
         MagentoProduct::query()->create([
             'sku' => '::sku_1::',
@@ -73,10 +73,10 @@ final class CheckRemovedProductsTest extends TestCase
         try {
             $action->check();
             $this->fail('Expected DeletionThresholdExceededException to be thrown.');
-        } catch (DeletionThresholdExceededException $exception) {
-            $this->assertSame(1, $exception->pendingDeletionCount);
-            $this->assertSame(5, $exception->totalCount);
-            $this->assertSame(0.1, $exception->threshold);
+        } catch (DeletionThresholdExceededException $deletionThresholdExceededException) {
+            $this->assertSame(1, $deletionThresholdExceededException->pendingDeletionCount);
+            $this->assertSame(5, $deletionThresholdExceededException->totalCount);
+            $this->assertEqualsWithDelta(0.1, $deletionThresholdExceededException->threshold, PHP_FLOAT_EPSILON);
         }
 
         /** @var ?MagentoProduct $candidate */
@@ -158,7 +158,7 @@ final class CheckRemovedProductsTest extends TestCase
     {
         Event::fake();
 
-        config()->set('magento-products.deletion_threshold', null);
+        config()->set('magento-products.deletion_threshold');
 
         foreach (range(1, 3) as $i) {
             MagentoProduct::query()->create([
