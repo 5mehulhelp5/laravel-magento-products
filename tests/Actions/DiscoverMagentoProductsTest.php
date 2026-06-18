@@ -173,6 +173,44 @@ final class DiscoverMagentoProductsTest extends TestCase
     {
         Http::fake([
             'magento/rest/all/V1/products?searchCriteria%5BpageSize%5D=2&searchCriteria%5BcurrentPage%5D=0' => Http::response([
+                'items' => [
+                    ['sku' => '456'],
+                ],
+            ]),
+        ])->preventingStrayRequests();
+
+        MagentoProduct::query()->create([
+            'sku' => '123',
+            'exists_in_magento' => true,
+            'retrieved' => true,
+        ]);
+
+        $this->mock(ProcessesMagentoSkus::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('process')->once();
+        });
+
+        $job = new DiscoverMagentoProductsJob;
+        $job->withFakeBatch();
+
+        /** @var Batch $batch */
+        $batch = $job->batch();
+
+        /** @var DiscoverMagentoProducts $action */
+        $action = app(DiscoverMagentoProducts::class);
+        $action->discover(0, $batch);
+
+        /** @var ?MagentoProduct $product */
+        $product = MagentoProduct::query()->firstWhere('sku', '=', '123');
+
+        $this->assertInstanceOf(MagentoProduct::class, $product);
+        $this->assertFalse($product->retrieved);
+    }
+
+    #[Test]
+    public function it_preserves_retrieved_when_magento_returns_no_items_on_first_page(): void
+    {
+        Http::fake([
+            'magento/rest/all/V1/products?searchCriteria%5BpageSize%5D=2&searchCriteria%5BcurrentPage%5D=0' => Http::response([
                 'items' => [],
             ]),
         ])->preventingStrayRequests();
@@ -198,10 +236,10 @@ final class DiscoverMagentoProductsTest extends TestCase
         $action->discover(0, $batch);
 
         /** @var ?MagentoProduct $product */
-        $product = MagentoProduct::query()->first();
+        $product = MagentoProduct::query()->firstWhere('sku', '=', '123');
 
         $this->assertInstanceOf(MagentoProduct::class, $product);
-        $this->assertFalse($product->retrieved);
+        $this->assertTrue($product->retrieved);
     }
 
     #[Test]

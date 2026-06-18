@@ -22,11 +22,6 @@ class DiscoverMagentoProducts implements DiscoversMagentoProducts
 
     public function discover(int $page, Batch $batch): void
     {
-        if ($page === 0) {
-            MagentoProduct::query()
-                ->update(['retrieved' => false]);
-        }
-
         $search = SearchCriteria::make()
             ->paginate($page, config('magento-products.page_size', 50))
             ->get();
@@ -37,6 +32,10 @@ class DiscoverMagentoProducts implements DiscoversMagentoProducts
 
         if ($hasNextPage) {
             $batch->add(new DiscoverMagentoProductsJob($page + 1));
+        }
+
+        if ($page === 0 && $products->isNotEmpty()) {
+            MagentoProduct::query()->update(['retrieved' => false]);
         }
 
         $skus = $products->pluck('sku');
