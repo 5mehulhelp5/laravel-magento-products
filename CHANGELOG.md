@@ -1,6 +1,14 @@
 # Changelog 
 
-[Unreleased changes](https://github.com/justbetter/laravel-magento-products/compare/1.9.0...main)
+[Unreleased changes](https://github.com/justbetter/laravel-magento-products/compare/1.9.1...main)
+## [1.9.1](https://github.com/justbetter/laravel-magento-products/releases/tag/1.9.1) - 2026-07-10
+
+### What's Changed
+* Fix bug where store specific records are counted by @VincentBean in https://github.com/justbetter/laravel-magento-products/pull/20
+
+
+**Full Changelog**: https://github.com/justbetter/laravel-magento-products/compare/1.9.0...1.9.1
+
 ## [1.9.0](https://github.com/justbetter/laravel-magento-products/releases/tag/1.9.0) - 2026-06-18
 
 ### What's Changed
