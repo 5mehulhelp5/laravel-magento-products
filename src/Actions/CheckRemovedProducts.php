@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JustBetter\MagentoProducts\Actions;
 
+use Illuminate\Support\Collection;
 use JustBetter\MagentoProducts\Contracts\ChecksRemovedProducts;
 use JustBetter\MagentoProducts\Events\ProductDeletedInMagentoEvent;
 use JustBetter\MagentoProducts\Exceptions\DeletionThresholdExceededException;
@@ -13,11 +14,16 @@ class CheckRemovedProducts implements ChecksRemovedProducts
 {
     public function check(): void
     {
-        $query = MagentoProduct::query()
-            ->where('exists_in_magento', '=', true)
-            ->where('retrieved', '=', false);
+        $retrievedSkus = MagentoProduct::query()
+            ->where('retrieved', '=', true)
+            ->select('sku');
 
-        $skus = $query->select(['sku'])->get();
+        /** @var Collection<int, string> $removedSkus */
+        $removedSkus = MagentoProduct::query()
+            ->where('exists_in_magento', '=', true)
+            ->whereNotIn('sku', $retrievedSkus)
+            ->distinct()
+            ->pluck('sku');
 
         /** @var ?float $threshold */
         $threshold = config('magento-products.deletion_threshold');
@@ -25,20 +31,23 @@ class CheckRemovedProducts implements ChecksRemovedProducts
         if ($threshold !== null) {
             $totalCount = MagentoProduct::query()
                 ->where('exists_in_magento', '=', true)
-                ->count();
+                ->distinct()
+                ->count('sku');
 
-            $ratio = $totalCount > 0 ? $skus->count() / $totalCount : 0;
+            $ratio = $totalCount > 0 ? $removedSkus->count() / $totalCount : 0;
 
             if ($ratio > $threshold) {
-                throw new DeletionThresholdExceededException($skus->count(), $totalCount, $threshold);
+                throw new DeletionThresholdExceededException($removedSkus->count(), $totalCount, $threshold);
             }
         }
 
-        $query->update([
-            'exists_in_magento' => false,
-        ]);
+        $removedSkus
+            ->chunk(500)
+            ->each(fn (Collection $chunk) => MagentoProduct::query()
+                ->whereIn('sku', $chunk->all())
+                ->update(['exists_in_magento' => false]));
 
-        $skus->each(fn (MagentoProduct $product) => ProductDeletedInMagentoEvent::dispatch($product->sku));
+        $removedSkus->each(fn (string $sku) => ProductDeletedInMagentoEvent::dispatch($sku));
     }
 
     public static function bind(): void

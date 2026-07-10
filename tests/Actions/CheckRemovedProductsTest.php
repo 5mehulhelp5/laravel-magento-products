@@ -176,4 +176,121 @@ final class CheckRemovedProductsTest extends TestCase
 
         Event::assertDispatchedTimes(ProductDeletedInMagentoEvent::class, 3);
     }
+
+    #[Test]
+    public function it_does_not_delete_sku_when_any_store_row_was_retrieved(): void
+    {
+        Event::fake();
+
+        config()->set('magento-products.deletion_threshold');
+
+        MagentoProduct::query()->create([
+            'sku' => '::sku_1::',
+            'store' => null,
+            'exists_in_magento' => true,
+            'retrieved' => false,
+        ]);
+
+        MagentoProduct::query()->create([
+            'sku' => '::sku_1::',
+            'store' => 'en',
+            'exists_in_magento' => true,
+            'retrieved' => true,
+        ]);
+
+        $action = app(CheckRemovedProducts::class);
+        $action->check();
+
+        $this->assertSame(2, MagentoProduct::query()->where('exists_in_magento', '=', true)->count());
+
+        Event::assertNotDispatched(ProductDeletedInMagentoEvent::class);
+    }
+
+    #[Test]
+    public function it_deletes_all_store_rows_for_a_removed_sku(): void
+    {
+        Event::fake();
+
+        config()->set('magento-products.deletion_threshold');
+
+        MagentoProduct::query()->create([
+            'sku' => '::sku_1::',
+            'store' => null,
+            'exists_in_magento' => true,
+            'retrieved' => false,
+        ]);
+
+        MagentoProduct::query()->create([
+            'sku' => '::sku_1::',
+            'store' => 'en',
+            'exists_in_magento' => true,
+            'retrieved' => false,
+        ]);
+
+        MagentoProduct::query()->create([
+            'sku' => '::sku_2::',
+            'store' => null,
+            'exists_in_magento' => true,
+            'retrieved' => true,
+        ]);
+
+        $action = app(CheckRemovedProducts::class);
+        $action->check();
+
+        $remaining = MagentoProduct::query()
+            ->where('sku', '=', '::sku_1::')
+            ->where('exists_in_magento', '=', true)
+            ->count();
+        $this->assertSame(0, $remaining);
+
+        /** @var ?MagentoProduct $survivor */
+        $survivor = MagentoProduct::query()->firstWhere('sku', '=', '::sku_2::');
+        $this->assertInstanceOf(MagentoProduct::class, $survivor);
+        $this->assertTrue($survivor->exists_in_magento);
+
+        Event::assertDispatchedTimes(ProductDeletedInMagentoEvent::class, 1);
+        Event::assertDispatched(
+            ProductDeletedInMagentoEvent::class,
+            fn (ProductDeletedInMagentoEvent $event): bool => $event->sku === '::sku_1::',
+        );
+    }
+
+    #[Test]
+    public function it_uses_distinct_sku_counts_for_threshold(): void
+    {
+        Event::fake();
+
+        config()->set('magento-products.deletion_threshold', 0.4);
+
+        foreach ([null, 'en', 'nl'] as $store) {
+            MagentoProduct::query()->create([
+                'sku' => '::sku_1::',
+                'store' => $store,
+                'exists_in_magento' => true,
+                'retrieved' => false,
+            ]);
+        }
+
+        MagentoProduct::query()->create([
+            'sku' => '::sku_2::',
+            'store' => null,
+            'exists_in_magento' => true,
+            'retrieved' => true,
+        ]);
+
+        $action = app(CheckRemovedProducts::class);
+
+        try {
+            $action->check();
+            $this->fail('Expected DeletionThresholdExceededException to be thrown.');
+        } catch (DeletionThresholdExceededException $deletionThresholdExceededException) {
+            $this->assertSame(1, $deletionThresholdExceededException->pendingDeletionCount);
+            $this->assertSame(2, $deletionThresholdExceededException->totalCount);
+            $this->assertEqualsWithDelta(0.4, $deletionThresholdExceededException->threshold, PHP_FLOAT_EPSILON);
+        }
+
+        $this->assertSame(4, MagentoProduct::query()->where('exists_in_magento', '=', true)->count());
+
+        Event::assertNotDispatched(ProductDeletedInMagentoEvent::class);
+    }
 }
